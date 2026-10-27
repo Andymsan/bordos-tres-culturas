@@ -19,6 +19,7 @@ VENTANA_DETALLE = (41, 61)          # muestras: mediana 20 m + Savitzky-Golay 30
 COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
 Y_GRAFICA = (2013.0, 2023.0)        # msnm, eje vertical fijo
+TAMANO_GRAFICA = (30, 4.5)          # pulgadas; más ancho = menos exageración vertical
 PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
 Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
 INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
@@ -79,7 +80,8 @@ def tramos_bajos(dist, z, cota, long_min):
 
 
 def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
-    fig, ax = plt.subplots(figsize=(14, 5))
+    plt.rcParams.update({"font.size": 15})
+    fig, ax = plt.subplots(figsize=TAMANO_GRAFICA)
     k = max(1, int(PASO_GRAFICA / PASO))
     crudo = pd.Series([v if v is not None else np.nan for v in z_crudo]).groupby(np.arange(len(dist)) // k).max()
     ax.plot(dist[::k][:len(crudo)], crudo, color="#dddddd", lw=0.8, label="máximo de la franja")
@@ -87,12 +89,12 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     segs = [[pts[i], pts[i + 1]] for i in range(len(pts) - 1)]
     limites = [c[0] for c in CLASES] + [CLASES[-1][1]]
     lc = LineCollection(segs, cmap=ListedColormap([c[3] for c in CLASES]),
-                        norm=BoundaryNorm(limites, len(CLASES)), linewidths=3)
+                        norm=BoundaryNorm(limites, len(CLASES)), linewidths=4)
     lc.set_array([(a[1] + b[1]) / 2 for a, b in segs])
     ax.add_collection(lc)
     for cota, txt in [(2016, "2016"), (2018, "2018 · cresta del vertedor"), (2020, "2020 · NAME")]:
         ax.axhline(cota, ls="--", lw=0.8, color="#555")
-        ax.text(dist[-1], cota + 0.05, txt, ha="right", va="bottom", fontsize=8, color="#333")
+        ax.text(dist[-1], cota + 0.05, txt, ha="right", va="bottom", fontsize=13, color="#333")
     ax.set_ylim(*Y_GRAFICA)
     ax.set_xlim(dist[0], dist[-1])
     ax.set_xlabel("Distancia a lo largo del bordo (m)")
@@ -100,25 +102,17 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     ax.set_title(titulo)
     ax.grid(alpha=0.3)
     if bajos:
-        ax.scatter([d for d, _, _ in bajos], [v for _, v, _ in bajos], marker="v", s=40, c="#7f0000", zorder=5,
+        ax.scatter([d for d, _, _ in bajos], [v for _, v, _ in bajos], marker="v", s=80, c="#7f0000", zorder=5,
                    label="punto bajo (detalle 20 m)")
         for d, v, largo in bajos:
             ax.annotate(f"{v:.2f}\n{largo:.0f} m", (d, v), xytext=(0, -10), textcoords="offset points",
-                        ha="center", va="top", fontsize=7, color="#7f0000")
-        d0 = min(bajos, key=lambda b: b[1])[0]
-        dd, zz = zip(*[(d, v) for d, v in zip(dist, z_filt) if v is not None and abs(d - d0) <= 150])
-        ins = ax.inset_axes([0.62, 0.05, 0.36, 0.1])
-        ins.fill_between(dd, Y_GRAFICA[0], zz, color="#8c7a5b")
-        ins.set_xlim(d0 - 150, d0 + 150); ins.set_ylim(Y_GRAFICA[0], Y_GRAFICA[1])
-        ins.set_aspect("equal", adjustable="datalim")
-        ins.set_xticks([]); ins.set_yticks([])
-        ins.set_title("Punto más bajo a escala real (300 m, sin exagerar)", fontsize=7)
-    ax.legend(loc="upper left", fontsize=8)
+                        ha="center", va="top", fontsize=12, color="#7f0000")
+    ax.legend(loc="upper left", fontsize=13)
     fig.tight_layout()
     bb = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     ex = ((dist[-1] - dist[0]) / bb.width) / ((Y_GRAFICA[1] - Y_GRAFICA[0]) / bb.height)
     ax.text(0.99, 0.98, f"Escala vertical exagerada ×{ex:.0f}", transform=ax.transAxes, ha="right", va="top",
-            fontsize=8, color="#555", style="italic")
+            fontsize=13, color="#555", style="italic")
     fig.savefig(ruta, dpi=150)
     plt.close(fig)
 
