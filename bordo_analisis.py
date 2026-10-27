@@ -14,8 +14,8 @@ from skimage.morphology import remove_small_objects
 from shapely.geometry import LineString, Point, shape
 
 SEMIANCHO, PASO = 2.0, 0.5          # m
-VENTANA_MEDIANA = 41                # muestras (20 m)
-VENTANA_SUAVE = 61                  # muestras (30 m)
+VENTANA_PERFIL = (121, 201)         # muestras: mediana 60 m + Savitzky-Golay 100 m, perfil del bordo
+VENTANA_DETALLE = (41, 61)          # muestras: mediana 20 m + Savitzky-Golay 30 m, puntos bajos angostos
 COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
 PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
@@ -77,7 +77,7 @@ def tramos_bajos(dist, z, cota, long_min):
     return res
 
 
-def graficar(titulo, dist, z_crudo, z_filt, ruta):
+def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     fig, ax = plt.subplots(figsize=(14, 5))
     k = max(1, int(PASO_GRAFICA / PASO))
     crudo = pd.Series([v if v is not None else np.nan for v in z_crudo]).groupby(np.arange(len(dist)) // k).max()
@@ -99,6 +99,9 @@ def graficar(titulo, dist, z_crudo, z_filt, ruta):
     ax.set_ylabel("Cota del bordo (msnm)")
     ax.set_title(titulo)
     ax.grid(alpha=0.3)
+    if bajos:
+        ax.scatter([d for d, _ in bajos], [v for _, v in bajos], marker="v", s=40, c="#7f0000", zorder=5,
+                   label="punto bajo (detalle 20 m)")
     ax.legend(loc="lower left", fontsize=8)
     fig.tight_layout()
     fig.savefig(ruta, dpi=150)
@@ -193,7 +196,9 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
             vals = [zmax(p.x + s * nx, p.y + s * ny) for s in np.arange(-SEMIANCHO, SEMIANCHO + 0.01, PASO)]
             vals = [v for v in vals if v is not None]
             dist.append(d); pts.append(p); zc.append(max(vals) if vals else None); oc.append(en_cresta(p.x, p.y)); ob.append(obstaculo(p.x, p.y))
-        zm = suavizar(mediana_movil(zc, VENTANA_MEDIANA), VENTANA_SUAVE)
+        zm = suavizar(mediana_movil(zc, VENTANA_PERFIL[0]), VENTANA_PERFIL[1])
+        zd = suavizar(mediana_movil(zc, VENTANA_DETALLE[0]), VENTANA_DETALLE[1])
+        marcas = []
 
         for i in range(len(pts) - 1):
             if zm[i] is None:
@@ -205,9 +210,10 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
                          "frec_pct": round(fr, 2), "dias_anio": round(fr * 3.65, 1), "meses_50pct": meses(v),
                          "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
                          "geometry": LineString([pts[i], pts[i + 1]])})
-        for t in tramos_bajos(dist, zm, COTA_ALERTA, LONG_MIN_BAJO):
+        for t in tramos_bajos(dist, zd, COTA_ALERTA, LONG_MIN_BAJO):
             i, v = t["i_min"], t["z_min"]
             fr = pct(niv, v)
+            marcas.append((dist[i], v))
             bajos.append({"margen": lado, "dist_m": round(dist[i], 1), "z_min": round(v, 2), "largo_m": round(t["largo"], 1),
                           "frec_pct": round(fr, 1), "dias_anio": round(fr * 3.65), "meses_50pct": meses(v),
                           "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
@@ -222,8 +228,8 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
                         "m_2018_2018_4": int(((zs >= 2018) & (zs < 2018.4)).sum() * PASO),
                         "pct_sobre_cresta": round(100 * np.mean(oc)),
                         "m_arbol": int(ob.count("árbol") * PASO), "m_edificio": int(ob.count("edificio") * PASO), "geometry": ln})
-        graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, f"{out}/perfil_margen_{lado}.png")
-        pd.DataFrame({"dist_m": dist, "x": [p.x for p in pts], "y": [p.y for p in pts], "z_cruda": zc, "z_bordo": zm,
+        graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, marcas, f"{out}/perfil_margen_{lado}.png")
+        pd.DataFrame({"dist_m": dist, "x": [p.x for p in pts], "y": [p.y for p in pts], "z_cruda": zc, "z_bordo": zm, "z_detalle": zd,
                       "dias_anio": [round(pct(niv, v) * 3.65, 1) if v is not None else None for v in zm],
                       "sobre_cresta": oc, "obstaculo": ob}).round(2).to_csv(f"{out}/perfil_margen_{lado}.csv", index=False, encoding="utf-8-sig")
 
