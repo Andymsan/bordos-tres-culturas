@@ -18,6 +18,7 @@ VENTANA_PERFIL = (121, 201)         # muestras: mediana 60 m + Savitzky-Golay 10
 VENTANA_DETALLE = (41, 61)          # muestras: mediana 20 m + Savitzky-Golay 30 m, puntos bajos angostos
 COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
+Y_GRAFICA = (2013.0, 2023.0)        # msnm, eje vertical fijo
 PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
 Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
 INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
@@ -92,18 +93,32 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     for cota, txt in [(2016, "2016"), (2018, "2018 · cresta del vertedor"), (2020, "2020 · NAME")]:
         ax.axhline(cota, ls="--", lw=0.8, color="#555")
         ax.text(dist[-1], cota + 0.05, txt, ha="right", va="bottom", fontsize=8, color="#333")
-    zs = [v for v in z_filt if v is not None]
-    ax.set_ylim(min(min(zs), 2015.5) - 0.3, max(max(zs), 2020.5) + 0.3)
+    ax.set_ylim(*Y_GRAFICA)
     ax.set_xlim(dist[0], dist[-1])
     ax.set_xlabel("Distancia a lo largo del bordo (m)")
     ax.set_ylabel("Cota del bordo (msnm)")
     ax.set_title(titulo)
     ax.grid(alpha=0.3)
     if bajos:
-        ax.scatter([d for d, _ in bajos], [v for _, v in bajos], marker="v", s=40, c="#7f0000", zorder=5,
+        ax.scatter([d for d, _, _ in bajos], [v for _, v, _ in bajos], marker="v", s=40, c="#7f0000", zorder=5,
                    label="punto bajo (detalle 20 m)")
-    ax.legend(loc="lower left", fontsize=8)
+        for d, v, largo in bajos:
+            ax.annotate(f"{v:.2f}\n{largo:.0f} m", (d, v), xytext=(0, -10), textcoords="offset points",
+                        ha="center", va="top", fontsize=7, color="#7f0000")
+        d0 = min(bajos, key=lambda b: b[1])[0]
+        dd, zz = zip(*[(d, v) for d, v in zip(dist, z_filt) if v is not None and abs(d - d0) <= 150])
+        ins = ax.inset_axes([0.62, 0.05, 0.36, 0.1])
+        ins.fill_between(dd, Y_GRAFICA[0], zz, color="#8c7a5b")
+        ins.set_xlim(d0 - 150, d0 + 150); ins.set_ylim(Y_GRAFICA[0], Y_GRAFICA[1])
+        ins.set_aspect("equal", adjustable="datalim")
+        ins.set_xticks([]); ins.set_yticks([])
+        ins.set_title("Punto más bajo a escala real (300 m, sin exagerar)", fontsize=7)
+    ax.legend(loc="upper left", fontsize=8)
     fig.tight_layout()
+    bb = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    ex = ((dist[-1] - dist[0]) / bb.width) / ((Y_GRAFICA[1] - Y_GRAFICA[0]) / bb.height)
+    ax.text(0.99, 0.98, f"Escala vertical exagerada ×{ex:.0f}", transform=ax.transAxes, ha="right", va="top",
+            fontsize=8, color="#555", style="italic")
     fig.savefig(ruta, dpi=150)
     plt.close(fig)
 
@@ -213,7 +228,7 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
         for t in tramos_bajos(dist, zd, COTA_ALERTA, LONG_MIN_BAJO):
             i, v = t["i_min"], t["z_min"]
             fr = pct(niv, v)
-            marcas.append((dist[i], v))
+            marcas.append((dist[i], v, t["largo"]))
             bajos.append({"margen": lado, "dist_m": round(dist[i], 1), "z_min": round(v, 2), "largo_m": round(t["largo"], 1),
                           "frec_pct": round(fr, 1), "dias_anio": round(fr * 3.65), "meses_50pct": meses(v),
                           "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
