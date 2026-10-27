@@ -1,9 +1,3 @@
-"""
-Porcentaje de días de cada mes en que el nivel de la presa Endhó supera cada cota.
-
-Uso:
-  python temporada_por_mes.py niveles_endho.xlsx carpeta_salida
-"""
 import sys, os
 import pandas as pd
 import matplotlib
