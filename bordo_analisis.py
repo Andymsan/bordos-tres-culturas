@@ -18,6 +18,7 @@ VENTANA_MEDIANA = 41                # muestras (20 m)
 VENTANA_SUAVE = 61                  # muestras (30 m)
 COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
+PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
 Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
 INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
 SALIENTE = 1.0                      # m sobre la mediana del MDT en 5 m: algo sobresale
@@ -78,7 +79,9 @@ def tramos_bajos(dist, z, cota, long_min):
 
 def graficar(titulo, dist, z_crudo, z_filt, ruta):
     fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(dist, [v if v is not None else np.nan for v in z_crudo], color="#bbbbbb", lw=0.8, label="máximo de la franja")
+    k = max(1, int(PASO_GRAFICA / PASO))
+    crudo = pd.Series([v if v is not None else np.nan for v in z_crudo]).groupby(np.arange(len(dist)) // k).max()
+    ax.plot(dist[::k][:len(crudo)], crudo, color="#dddddd", lw=0.8, label="máximo de la franja")
     pts = [(d, v) for d, v in zip(dist, z_filt) if v is not None]
     segs = [[pts[i], pts[i + 1]] for i in range(len(pts) - 1)]
     limites = [c[0] for c in CLASES] + [CLASES[-1][1]]
