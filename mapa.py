@@ -1,9 +1,3 @@
-"""
-Mapa de los bordos por cota sobre el relieve del MDT.
-
-Uso:
-  python mapa.py MDT.tif resultados/bordo_analisis.gpkg salida.png
-"""
 import sys
 import numpy as np, geopandas as gpd, rasterio
 import matplotlib
