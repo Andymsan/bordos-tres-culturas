@@ -7,11 +7,13 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from rasterio.windows import from_bounds
 from scipy import ndimage as ndi
+from scipy.signal import savgol_filter
 from skimage.morphology import remove_small_objects
 from shapely.geometry import LineString, Point
 
 SEMIANCHO, PASO = 2.0, 0.5          # m
-VENTANA_MEDIANA = 11                # muestras (5 m)
+VENTANA_MEDIANA = 41                # muestras (20 m)
+VENTANA_SUAVE = 61                  # muestras (30 m)
 COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
 Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
@@ -42,6 +44,15 @@ def mediana_movil(valores, n):
         v = [x for x in valores[max(0, i - m): i + m + 1] if x is not None]
         out.append(statistics.median(v) if v else None)
     return out
+
+
+def suavizar(valores, n):
+    v = pd.Series(valores, dtype="float64")
+    ok = v.notna()
+    if ok.sum() < n:
+        return valores
+    s = savgol_filter(v.interpolate(limit_direction="both"), n, 2)
+    return [float(a) if b else None for a, b in zip(s, ok)]
 
 
 def tramos_bajos(dist, z, cota, long_min):
@@ -152,7 +163,7 @@ def main(mdt, niveles, gpkg, capa, out):
             vals = [zmax(p.x + s * nx, p.y + s * ny) for s in np.arange(-SEMIANCHO, SEMIANCHO + 0.01, PASO)]
             vals = [v for v in vals if v is not None]
             dist.append(d); pts.append(p); zc.append(max(vals) if vals else None); oc.append(en_cresta(p.x, p.y))
-        zm = mediana_movil(zc, VENTANA_MEDIANA)
+        zm = suavizar(mediana_movil(zc, VENTANA_MEDIANA), VENTANA_SUAVE)
 
         for i in range(len(pts) - 1):
             if zm[i] is None:
