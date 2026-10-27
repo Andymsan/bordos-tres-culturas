@@ -4,6 +4,10 @@
 
 ![Temporada por mes](resultados/temporada_por_mes.png)
 
+## Temporada por margen
+
+![Temporada por margen](resultados/temporada_por_margen.png)
+
 ## Bordos
 
 ![Mapa de bordos](resultados/mapa_bordos.png)
@@ -19,6 +23,7 @@
 - [Puntos bajos](resultados/puntos_bajos.csv)
 - [Resumen por margen](resultados/resumen_por_margen.csv)
 - [Temporada por mes](resultados/temporada_por_mes.csv)
+- [Temporada por margen](resultados/temporada_por_margen.csv)
 
 ## Archivos
 
@@ -29,6 +34,7 @@
 | `estilos/` | Estilos QGIS para el MDT y las capas |
 | `bordo_analisis.py` | Perfil, frecuencias y puntos bajos |
 | `temporada_por_mes.py` | Tabla y figura mes × cota |
+| `temporada_por_margen.py` | Tabla y figura mes × tramo, por margen |
 | `mapa.py` | Mapa del bordo por cota |
 
 ## Uso
@@ -37,6 +43,7 @@
 pip install -r requirements.txt
 python temporada_por_mes.py niveles_endho.xlsx resultados
 python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg bordo resultados
+python temporada_por_margen.py niveles_endho.xlsx resultados
 python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
 ```
 
