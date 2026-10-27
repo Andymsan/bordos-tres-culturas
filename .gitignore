@@ -1,0 +1,6 @@
+__pycache__/
+*.tif
+*.tif.aux.xml
+*.xlsx
+*.gpkg-wal
+*.gpkg-shm

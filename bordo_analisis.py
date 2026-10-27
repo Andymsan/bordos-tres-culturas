@@ -1,0 +1,215 @@
+"""
+Perfil de altura máxima de los bordos y frecuencia con que la presa Endhó los rebasa.
+
+Para cada línea de bordo (campo "margen"):
+  - perfil cada 0.5 m: máximo en ±2 m perpendicular + mediana móvil de 5 m
+  - % del tiempo y días/año en que el nivel de la presa supera el bordo
+  - meses en que se supera el bordo al menos el 50 % de los días
+  - puntos bajos: tramos < 2018.4 msnm de al menos 2 m
+  - sobre_cresta: si la línea coincide con una cresta detectada en el MDT
+
+Uso:
+  python bordo_analisis.py MDT.tif niveles_endho.xlsx bordos.gpkg capa carpeta_salida
+"""
+import sys, os, math, statistics
+import numpy as np, pandas as pd, rasterio, geopandas as gpd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from rasterio.windows import from_bounds
+from scipy import ndimage as ndi
+from skimage.morphology import remove_small_objects
+from shapely.geometry import LineString, Point
+
+SEMIANCHO, PASO = 2.0, 0.5          # m
+VENTANA_MEDIANA = 11                # muestras (5 m)
+COTA_ALERTA = 2018.4                # msnm
+LONG_MIN_BAJO = 2.0                 # m
+Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
+INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
+MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+CLASES = [  # (desde, hasta, etiqueta, color)
+    (1990.0, 2016.0, "< 2016 · > 57% del tiempo", "#7f0000"),
+    (2016.0, 2017.0, "2016–2017 · 46–57%", "#d7301f"),
+    (2017.0, 2018.0, "2017–2018 · 23–46%", "#fc8d59"),
+    (2018.0, 2018.4, "2018–2018.4 · 3–23%", "#fdcc8a"),
+    (2018.4, 2019.0, "2018.4–2019 · < 3%", "#a6d96a"),
+    (2019.0, 2020.0, "2019–2020 · < 0.03%", "#1a9641"),
+    (2020.0, 2100.0, "≥ 2020 · NAME", "#2b83ba"),
+]
+
+
+def clase_de(z):
+    for a, b, etiqueta, _ in CLASES:
+        if a <= z < b:
+            return etiqueta
+    return CLASES[-1][2]
+
+
+def mediana_movil(valores, n):
+    m = n // 2
+    out = []
+    for i in range(len(valores)):
+        v = [x for x in valores[max(0, i - m): i + m + 1] if x is not None]
+        out.append(statistics.median(v) if v else None)
+    return out
+
+
+def tramos_bajos(dist, z, cota, long_min):
+    res, ini = [], None
+    for i, v in enumerate(z + [None]):
+        bajo = v is not None and v < cota
+        if bajo and ini is None:
+            ini = i
+        elif not bajo and ini is not None:
+            fin = i - 1
+            if dist[fin] - dist[ini] >= long_min:
+                k = min(range(ini, fin + 1), key=lambda j: z[j])
+                res.append({"largo": dist[fin] - dist[ini], "i_min": k, "z_min": z[k]})
+            ini = None
+    return res
+
+
+def graficar(titulo, dist, z_crudo, z_filt, ruta):
+    fig, ax = plt.subplots(figsize=(14, 5))
+    ax.plot(dist, [v if v is not None else np.nan for v in z_crudo], color="#bbbbbb", lw=0.8, label="máximo de la franja")
+    pts = [(d, v) for d, v in zip(dist, z_filt) if v is not None]
+    segs = [[pts[i], pts[i + 1]] for i in range(len(pts) - 1)]
+    limites = [c[0] for c in CLASES] + [CLASES[-1][1]]
+    lc = LineCollection(segs, cmap=ListedColormap([c[3] for c in CLASES]),
+                        norm=BoundaryNorm(limites, len(CLASES)), linewidths=3)
+    lc.set_array([(a[1] + b[1]) / 2 for a, b in segs])
+    ax.add_collection(lc)
+    for cota, txt in [(2016, "2016"), (2018, "2018 · cresta del vertedor"), (2020, "2020 · NAME")]:
+        ax.axhline(cota, ls="--", lw=0.8, color="#555")
+        ax.text(dist[-1], cota + 0.05, txt, ha="right", va="bottom", fontsize=8, color="#333")
+    zs = [v for v in z_filt if v is not None]
+    ax.set_ylim(min(min(zs), 2015.5) - 0.3, max(max(zs), 2020.5) + 0.3)
+    ax.set_xlim(dist[0], dist[-1])
+    ax.set_xlabel("Distancia a lo largo del bordo (m)")
+    ax.set_ylabel("Cota del bordo (msnm)")
+    ax.set_title(titulo)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower left", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(ruta, dpi=150)
+    plt.close(fig)
+
+
+def main(mdt, niveles, gpkg, capa, out):
+    os.makedirs(out, exist_ok=True)
+    lineas = gpd.read_file(gpkg, layer=capa)
+    b = lineas.total_bounds
+    with rasterio.open(mdt) as r:
+        lineas = lineas.to_crs(r.crs)
+        w = from_bounds(b[0] - 30, b[1] - 30, b[2] + 30, b[3] + 30, r.transform)
+        z = r.read(1, window=w).astype("float64")
+        z[z < 1900] = np.nan
+        T, crs = r.window_transform(w), r.crs
+    px = T.a
+    valid = ~np.isnan(z)
+    zf = np.where(valid, z, -1e9)
+
+    def rc(x, y):
+        return int((T.f - y) / px), int((x - T.c) / px)
+
+    k = int(10 / px) * 2 + 1
+    media = ndi.uniform_filter(np.where(valid, z, 0), k) / np.maximum(ndi.uniform_filter(valid.astype("float32"), k), 1e-6)
+    cresta = valid & (z - media > 0.3) & (z > 2015) & (z < Z_ESTRUCTURA)
+    cresta = remove_small_objects(ndi.binary_closing(cresta, iterations=2), int(10 / px ** 2))
+    cerca_cresta = ndi.binary_dilation(cresta, iterations=int(1.5 / px))
+
+    def zmax(x, y, rad=0.3):
+        r_, c_ = rc(x, y)
+        n_ = max(1, int(rad / px))
+        v = zf[max(0, r_ - n_): r_ + n_ + 1, max(0, c_ - n_): c_ + n_ + 1]
+        v = v[(v > 0) & (v < Z_ESTRUCTURA)]
+        return float(v.max()) if v.size else None
+
+    def en_cresta(x, y):
+        r_, c_ = rc(x, y)
+        return bool(0 <= r_ < z.shape[0] and 0 <= c_ < z.shape[1] and cerca_cresta[r_, c_])
+
+    nv = pd.read_excel(niveles, sheet_name="Gráfica Nivel Endhó", usecols=[1, 2])
+    nv.columns = ["fecha", "nivel"]
+    nv = nv.dropna()
+    nv = nv[(nv.nivel > 1990) & (nv.nivel < 2030)]
+    nv["mes"] = pd.to_datetime(nv.fecha).dt.month
+    niv = np.sort(nv.nivel.values)
+    niv_m = {m: np.sort(nv[nv.mes == m].nivel.values) for m in range(1, 13)}
+
+    def pct(s, v):
+        return 100 * (len(s) - np.searchsorted(s, v, side="right")) / len(s)
+
+    def meses(v):
+        ms = [MESES[m - 1] for m in range(1, 13) if pct(niv_m[m], v) >= 50]
+        return ", ".join(ms) if ms else "ninguno"
+
+    segs, bajos, resumen = [], [], []
+    for j, f in lineas.iterrows():
+        lado = str(f.get("margen") or f"linea_{j}")
+        geoms = list(f.geometry.geoms) if f.geometry.geom_type.startswith("Multi") else [f.geometry]
+        ln = LineString([c for g in geoms for c in g.coords])
+        if Point(ln.coords[-1]).distance(Point(INICIO_RIO)) < Point(ln.coords[0]).distance(Point(INICIO_RIO)):
+            ln = LineString(list(ln.coords)[::-1])
+
+        dist, pts, zc, oc = [], [], [], []
+        for d in np.arange(0, ln.length, PASO):
+            p = ln.interpolate(d)
+            q, o = ln.interpolate(min(d + 1, ln.length)), ln.interpolate(max(d - 1, 0))
+            tx, ty = q.x - o.x, q.y - o.y
+            n_ = math.hypot(tx, ty) or 1
+            nx, ny = -ty / n_, tx / n_
+            vals = [zmax(p.x + s * nx, p.y + s * ny) for s in np.arange(-SEMIANCHO, SEMIANCHO + 0.01, PASO)]
+            vals = [v for v in vals if v is not None]
+            dist.append(d); pts.append(p); zc.append(max(vals) if vals else None); oc.append(en_cresta(p.x, p.y))
+        zm = mediana_movil(zc, VENTANA_MEDIANA)
+
+        for i in range(len(pts) - 1):
+            if zm[i] is None:
+                continue
+            v = zm[i]
+            fr = pct(niv, v)
+            segs.append({"margen": lado, "dist_m": round(dist[i], 1), "z_bordo": round(v, 2),
+                         "z_cruda": round(zc[i], 2) if zc[i] is not None else None, "clase": clase_de(v),
+                         "frec_pct": round(fr, 2), "dias_anio": round(fr * 3.65, 1), "meses_50pct": meses(v),
+                         "sobre_cresta": "sí" if oc[i] else "no",
+                         "geometry": LineString([pts[i], pts[i + 1]])})
+        for t in tramos_bajos(dist, zm, COTA_ALERTA, LONG_MIN_BAJO):
+            i, v = t["i_min"], t["z_min"]
+            fr = pct(niv, v)
+            bajos.append({"margen": lado, "dist_m": round(dist[i], 1), "z_min": round(v, 2), "largo_m": round(t["largo"], 1),
+                          "frec_pct": round(fr, 1), "dias_anio": round(fr * 3.65), "meses_50pct": meses(v),
+                          "sobre_cresta": "sí" if oc[i] else "no",
+                          **{m: round(pct(niv_m[n + 1], v), 1) for n, m in enumerate(MESES)}, "geometry": pts[i]})
+
+        zs = np.array([v for v in zm if v is not None])
+        resumen.append({"margen": lado, "largo_m": round(ln.length), "z_min": round(zs.min(), 2),
+                        "z_mediana": round(float(np.median(zs)), 2), "z_max": round(zs.max(), 2),
+                        "m_bajo_2016": int((zs < 2016).sum() * PASO),
+                        "m_2016_2017": int(((zs >= 2016) & (zs < 2017)).sum() * PASO),
+                        "m_2017_2018": int(((zs >= 2017) & (zs < 2018)).sum() * PASO),
+                        "m_2018_2018_4": int(((zs >= 2018) & (zs < 2018.4)).sum() * PASO),
+                        "pct_sobre_cresta": round(100 * np.mean(oc)), "geometry": ln})
+        graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, f"{out}/perfil_margen_{lado}.png")
+        pd.DataFrame({"dist_m": dist, "x": [p.x for p in pts], "y": [p.y for p in pts], "z_cruda": zc, "z_bordo": zm,
+                      "dias_anio": [round(pct(niv, v) * 3.65, 1) if v is not None else None for v in zm],
+                      "sobre_cresta": oc}).round(2).to_csv(f"{out}/perfil_margen_{lado}.csv", index=False, encoding="utf-8-sig")
+
+    g = f"{out}/bordo_analisis.gpkg"
+    if os.path.exists(g):
+        os.remove(g)
+    gpd.GeoDataFrame(resumen, crs=crs).to_file(g, layer="bordo", driver="GPKG")
+    gpd.GeoDataFrame(segs, crs=crs).to_file(g, layer="bordo_por_cota", driver="GPKG")
+    B = gpd.GeoDataFrame(bajos, crs=crs).sort_values("z_min")
+    B.insert(0, "id", range(1, len(B) + 1))
+    B.to_file(g, layer="puntos_bajos", driver="GPKG")
+    B.drop(columns="geometry").assign(x=B.geometry.x.round(1), y=B.geometry.y.round(1)).to_csv(
+        f"{out}/puntos_bajos.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame(resumen).drop(columns="geometry").to_csv(f"{out}/resumen_por_margen.csv", index=False, encoding="utf-8-sig")
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:6])

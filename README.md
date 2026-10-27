@@ -1,0 +1,43 @@
+# Bordos Tres Culturas
+
+## Temporada por mes
+
+![Temporada por mes](resultados/temporada_por_mes.png)
+
+## Bordos
+
+![Mapa de bordos](resultados/mapa_bordos.png)
+
+## Perfiles
+
+![Margen izquierda](resultados/perfil_margen_Izquierda.png)
+
+![Margen derecha](resultados/perfil_margen_Derecha.png)
+
+## Tablas
+
+- [Puntos bajos](resultados/puntos_bajos.csv)
+- [Resumen por margen](resultados/resumen_por_margen.csv)
+- [Temporada por mes](resultados/temporada_por_mes.csv)
+
+## Archivos
+
+| Archivo | Contenido |
+|---|---|
+| `datos/bordos.gpkg` | Eje por margen |
+| `resultados/bordo_analisis.gpkg` | Bordo por cota, puntos bajos y bordos (con estilo) |
+| `estilos/` | Estilos QGIS para el MDT y las capas |
+| `bordo_analisis.py` | Perfil, frecuencias y puntos bajos |
+| `temporada_por_mes.py` | Tabla y figura mes × cota |
+| `mapa.py` | Mapa del bordo por cota |
+
+## Uso
+
+```
+pip install -r requirements.txt
+python temporada_por_mes.py niveles_endho.xlsx resultados
+python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg bordo resultados
+python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
+```
+
+MDT: `MDT_27102025.tif` (EPSG:32614). Niveles: registro diario de la presa Endhó 1995–2025.
