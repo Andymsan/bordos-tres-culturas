@@ -236,10 +236,13 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
     B.insert(0, "id", range(1, len(B) + 1))
     B.to_file(g, layer="puntos_bajos", driver="GPKG")
     if obst.any():
-        cerca = lineas.buffer(SEMIANCHO + 1).union_all()
+        franja = lineas.buffer(SEMIANCHO + 1).union_all()
         ob_geo = [(shape(p), OBSTACULO[int(v)]) for p, v in shapes(obst, mask=obst > 0, transform=T)]
-        gpd.GeoDataFrame({"tipo": [t for _, t in ob_geo]}, geometry=[p for p, _ in ob_geo], crs=crs).clip(cerca).to_file(
-            g, layer="obstaculos", driver="GPKG")
+        O = gpd.GeoDataFrame({"tipo": [t for _, t in ob_geo]}, geometry=[p for p, _ in ob_geo], crs=crs)
+        O = O[O.intersects(lineas.buffer(40).union_all())].copy()
+        O["sobre_bordo"] = np.where(O.intersects(franja), "sí", "no")
+        O["area_m2"] = O.area.round(1)
+        O.to_file(g, layer="obstaculos", driver="GPKG")
     B.drop(columns="geometry").assign(x=B.geometry.x.round(1), y=B.geometry.y.round(1)).to_csv(
         f"{out}/puntos_bajos.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(resumen).drop(columns="geometry").to_csv(f"{out}/resumen_por_margen.csv", index=False, encoding="utf-8-sig")

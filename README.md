@@ -12,6 +12,10 @@
 
 ![Mapa de bordos](resultados/mapa_bordos.png)
 
+## Árboles y edificios
+
+![Árboles y edificios](resultados/mapa_obstaculos.png)
+
 ## Perfiles
 
 ![Margen izquierda](resultados/perfil_margen_Izquierda.png)
@@ -37,6 +41,7 @@
 | `temporada_por_mes.py` | Tabla y figura mes × cota |
 | `temporada_por_margen.py` | Tabla y figura mes × tramo, por margen |
 | `mapa.py` | Mapa del bordo por cota |
+| `mapa_obstaculos.py` | Mapa de árboles y edificios sobre y cerca del bordo |
 
 ## Uso
 
@@ -47,6 +52,7 @@ python gee_obstaculos.py datos/bordos.gpkg bordo datos <proyecto_gee>
 python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg bordo resultados datos/satelite.tif
 python temporada_por_margen.py niveles_endho.xlsx resultados
 python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
+python mapa_obstaculos.py MDT_27102025.tif resultados resultados/mapa_obstaculos.png
 ```
 
 MDT: `MDT_27102025.tif` (EPSG:32614). Niveles: registro diario de la presa Endhó 1995–2025.
