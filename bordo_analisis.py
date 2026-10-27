@@ -1,16 +1,3 @@
-"""
-Perfil de altura máxima de los bordos y frecuencia con que la presa Endhó los rebasa.
-
-Para cada línea de bordo (campo "margen"):
-  - perfil cada 0.5 m: máximo en ±2 m perpendicular + mediana móvil de 5 m
-  - % del tiempo y días/año en que el nivel de la presa supera el bordo
-  - meses en que se supera el bordo al menos el 50 % de los días
-  - puntos bajos: tramos < 2018.4 msnm de al menos 2 m
-  - sobre_cresta: si la línea coincide con una cresta detectada en el MDT
-
-Uso:
-  python bordo_analisis.py MDT.tif niveles_endho.xlsx bordos.gpkg capa carpeta_salida
-"""
 import sys, os, math, statistics
 import numpy as np, pandas as pd, rasterio, geopandas as gpd
 import matplotlib
