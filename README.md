@@ -1,12 +1,10 @@
 # Bordos Tres Culturas
 
-## Temporada por mes
+## Perfiles
 
-![Temporada por mes](resultados/temporada_por_mes.png)
+![Margen izquierda](resultados/perfil_margen_Izquierda.png)
 
-## Temporada por margen
-
-![Temporada por margen](resultados/temporada_por_margen.png)
+![Margen derecha](resultados/perfil_margen_Derecha.png)
 
 ## Bordos
 
@@ -16,11 +14,13 @@
 
 ![Árboles y edificios](resultados/mapa_obstaculos.png)
 
-## Perfiles
+## Temporada por mes
 
-![Margen izquierda](resultados/perfil_margen_Izquierda.png)
+![Temporada por mes](resultados/temporada_por_mes.png)
 
-![Margen derecha](resultados/perfil_margen_Derecha.png)
+## Temporada por margen
+
+![Temporada por margen](resultados/temporada_por_margen.png)
 
 ## Tablas
 
