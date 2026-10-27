@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from rasterio.windows import from_bounds
+from rasterio.warp import reproject, Resampling
+from rasterio.features import shapes
 from scipy import ndimage as ndi
 from scipy.signal import savgol_filter
 from skimage.morphology import remove_small_objects
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, shape
 
 SEMIANCHO, PASO = 2.0, 0.5          # m
 VENTANA_MEDIANA = 41                # muestras (20 m)
@@ -18,6 +20,10 @@ COTA_ALERTA = 2018.4                # msnm
 LONG_MIN_BAJO = 2.0                 # m
 Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
 INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
+SALIENTE = 1.0                      # m sobre la mediana del MDT en 5 m: algo sobresale
+NDVI_ARBOL = 0.4                    # Sentinel-2
+ALTURA_ARBOL = 2.0                  # m, dosel de Meta
+OBSTACULO = {0: "no", 1: "árbol", 2: "edificio"}
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 CLASES = [  # (desde, hasta, etiqueta, color)
     (1990.0, 2016.0, "< 2016 · > 57% del tiempo", "#7f0000"),
@@ -96,7 +102,7 @@ def graficar(titulo, dist, z_crudo, z_filt, ruta):
     plt.close(fig)
 
 
-def main(mdt, niveles, gpkg, capa, out):
+def main(mdt, niveles, gpkg, capa, out, satelite=None):
     os.makedirs(out, exist_ok=True)
     lineas = gpd.read_file(gpkg, layer=capa)
     b = lineas.total_bounds
@@ -108,7 +114,24 @@ def main(mdt, niveles, gpkg, capa, out):
         T, crs = r.window_transform(w), r.crs
     px = T.a
     valid = ~np.isnan(z)
-    zf = np.where(valid, z, -1e9)
+    obst = np.zeros(z.shape, "uint8")
+    if satelite:
+        dosel, ndvi, edif = (np.zeros(z.shape, "float32") for _ in range(3))
+        with rasterio.open(satelite) as o:
+            for banda, dst in zip((1, 2, 3), (dosel, ndvi, edif)):
+                reproject(o.read(banda).astype("float32"), dst, src_transform=o.transform, src_crs=o.crs,
+                          dst_transform=T, dst_crs=crs, resampling=Resampling.nearest)
+        relleno = np.where(valid, z, np.nanmedian(z))
+        f = max(1, int(1 / px))
+        h, w_ = (s // f * f for s in z.shape)
+        grueso = relleno[:h, :w_].reshape(h // f, f, w_ // f, f).mean(axis=(1, 3))
+        fondo = np.repeat(np.repeat(ndi.median_filter(grueso, int(5 / (px * f)) | 1), f, 0), f, 1)
+        fondo = np.pad(fondo, ((0, z.shape[0] - h), (0, z.shape[1] - w_)), mode="edge")
+        saliente = valid & (z - fondo > SALIENTE)
+        arbol = (ndvi / 100 >= NDVI_ARBOL) & (saliente | (dosel >= ALTURA_ARBOL))
+        obst[ndi.binary_dilation(arbol, iterations=int(1 / px))] = 1
+        obst[edif > 0] = 2
+    zf = np.where(valid & (obst == 0), z, -1e9)
 
     def rc(x, y):
         return int((T.f - y) / px), int((x - T.c) / px)
@@ -129,6 +152,10 @@ def main(mdt, niveles, gpkg, capa, out):
     def en_cresta(x, y):
         r_, c_ = rc(x, y)
         return bool(0 <= r_ < z.shape[0] and 0 <= c_ < z.shape[1] and cerca_cresta[r_, c_])
+
+    def obstaculo(x, y):
+        r_, c_ = rc(x, y)
+        return OBSTACULO[int(obst[r_, c_])] if 0 <= r_ < z.shape[0] and 0 <= c_ < z.shape[1] else "no"
 
     nv = pd.read_excel(niveles, sheet_name="Gráfica Nivel Endhó", usecols=[1, 2])
     nv.columns = ["fecha", "nivel"]
@@ -153,7 +180,7 @@ def main(mdt, niveles, gpkg, capa, out):
         if Point(ln.coords[-1]).distance(Point(INICIO_RIO)) < Point(ln.coords[0]).distance(Point(INICIO_RIO)):
             ln = LineString(list(ln.coords)[::-1])
 
-        dist, pts, zc, oc = [], [], [], []
+        dist, pts, zc, oc, ob = [], [], [], [], []
         for d in np.arange(0, ln.length, PASO):
             p = ln.interpolate(d)
             q, o = ln.interpolate(min(d + 1, ln.length)), ln.interpolate(max(d - 1, 0))
@@ -162,7 +189,7 @@ def main(mdt, niveles, gpkg, capa, out):
             nx, ny = -ty / n_, tx / n_
             vals = [zmax(p.x + s * nx, p.y + s * ny) for s in np.arange(-SEMIANCHO, SEMIANCHO + 0.01, PASO)]
             vals = [v for v in vals if v is not None]
-            dist.append(d); pts.append(p); zc.append(max(vals) if vals else None); oc.append(en_cresta(p.x, p.y))
+            dist.append(d); pts.append(p); zc.append(max(vals) if vals else None); oc.append(en_cresta(p.x, p.y)); ob.append(obstaculo(p.x, p.y))
         zm = suavizar(mediana_movil(zc, VENTANA_MEDIANA), VENTANA_SUAVE)
 
         for i in range(len(pts) - 1):
@@ -173,14 +200,14 @@ def main(mdt, niveles, gpkg, capa, out):
             segs.append({"margen": lado, "dist_m": round(dist[i], 1), "z_bordo": round(v, 2),
                          "z_cruda": round(zc[i], 2) if zc[i] is not None else None, "clase": clase_de(v),
                          "frec_pct": round(fr, 2), "dias_anio": round(fr * 3.65, 1), "meses_50pct": meses(v),
-                         "sobre_cresta": "sí" if oc[i] else "no",
+                         "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
                          "geometry": LineString([pts[i], pts[i + 1]])})
         for t in tramos_bajos(dist, zm, COTA_ALERTA, LONG_MIN_BAJO):
             i, v = t["i_min"], t["z_min"]
             fr = pct(niv, v)
             bajos.append({"margen": lado, "dist_m": round(dist[i], 1), "z_min": round(v, 2), "largo_m": round(t["largo"], 1),
                           "frec_pct": round(fr, 1), "dias_anio": round(fr * 3.65), "meses_50pct": meses(v),
-                          "sobre_cresta": "sí" if oc[i] else "no",
+                          "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
                           **{m: round(pct(niv_m[n + 1], v), 1) for n, m in enumerate(MESES)}, "geometry": pts[i]})
 
         zs = np.array([v for v in zm if v is not None])
@@ -190,11 +217,12 @@ def main(mdt, niveles, gpkg, capa, out):
                         "m_2016_2017": int(((zs >= 2016) & (zs < 2017)).sum() * PASO),
                         "m_2017_2018": int(((zs >= 2017) & (zs < 2018)).sum() * PASO),
                         "m_2018_2018_4": int(((zs >= 2018) & (zs < 2018.4)).sum() * PASO),
-                        "pct_sobre_cresta": round(100 * np.mean(oc)), "geometry": ln})
+                        "pct_sobre_cresta": round(100 * np.mean(oc)),
+                        "m_arbol": int(ob.count("árbol") * PASO), "m_edificio": int(ob.count("edificio") * PASO), "geometry": ln})
         graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, f"{out}/perfil_margen_{lado}.png")
         pd.DataFrame({"dist_m": dist, "x": [p.x for p in pts], "y": [p.y for p in pts], "z_cruda": zc, "z_bordo": zm,
                       "dias_anio": [round(pct(niv, v) * 3.65, 1) if v is not None else None for v in zm],
-                      "sobre_cresta": oc}).round(2).to_csv(f"{out}/perfil_margen_{lado}.csv", index=False, encoding="utf-8-sig")
+                      "sobre_cresta": oc, "obstaculo": ob}).round(2).to_csv(f"{out}/perfil_margen_{lado}.csv", index=False, encoding="utf-8-sig")
 
     g = f"{out}/bordo_analisis.gpkg"
     if os.path.exists(g):
@@ -204,10 +232,15 @@ def main(mdt, niveles, gpkg, capa, out):
     B = gpd.GeoDataFrame(bajos, crs=crs).sort_values("z_min")
     B.insert(0, "id", range(1, len(B) + 1))
     B.to_file(g, layer="puntos_bajos", driver="GPKG")
+    if obst.any():
+        cerca = lineas.buffer(SEMIANCHO + 1).union_all()
+        ob_geo = [(shape(p), OBSTACULO[int(v)]) for p, v in shapes(obst, mask=obst > 0, transform=T)]
+        gpd.GeoDataFrame({"tipo": [t for _, t in ob_geo]}, geometry=[p for p, _ in ob_geo], crs=crs).clip(cerca).to_file(
+            g, layer="obstaculos", driver="GPKG")
     B.drop(columns="geometry").assign(x=B.geometry.x.round(1), y=B.geometry.y.round(1)).to_csv(
         f"{out}/puntos_bajos.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(resumen).drop(columns="geometry").to_csv(f"{out}/resumen_por_margen.csv", index=False, encoding="utf-8-sig")
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:6])
+    main(*sys.argv[1:7])

@@ -30,9 +30,10 @@
 | Archivo | Contenido |
 |---|---|
 | `datos/bordos.gpkg` | Eje por margen |
-| `resultados/bordo_analisis.gpkg` | Bordo por cota, puntos bajos y bordos (con estilo) |
+| `resultados/bordo_analisis.gpkg` | Bordo por cota, puntos bajos, bordos y obstáculos |
 | `estilos/` | Estilos QGIS para el MDT y las capas |
-| `bordo_analisis.py` | Perfil, frecuencias y puntos bajos |
+| `gee_obstaculos.py` | Dosel (Meta), NDVI 2025 (Sentinel-2) y edificios (Open Buildings) desde Earth Engine |
+| `bordo_analisis.py` | Perfil, frecuencias y puntos bajos; excluye árboles y edificios |
 | `temporada_por_mes.py` | Tabla y figura mes × cota |
 | `temporada_por_margen.py` | Tabla y figura mes × tramo, por margen |
 | `mapa.py` | Mapa del bordo por cota |
@@ -42,7 +43,8 @@
 ```
 pip install -r requirements.txt
 python temporada_por_mes.py niveles_endho.xlsx resultados
-python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg bordo resultados
+python gee_obstaculos.py datos/bordos.gpkg bordo datos <proyecto_gee>
+python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg bordo resultados datos/satelite.tif
 python temporada_por_margen.py niveles_endho.xlsx resultados
 python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
 ```

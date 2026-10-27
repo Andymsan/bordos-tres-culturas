@@ -8,3 +8,4 @@ rasterio
 geopandas
 pyogrio
 shapely
+earthengine-api
