@@ -28,14 +28,14 @@ NDVI_ARBOL = 0.4                    # Sentinel-2
 ALTURA_ARBOL = 2.0                  # m, dosel de Meta
 OBSTACULO = {0: "no", 1: "árbol", 2: "edificio"}
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
-CLASES = [  # (desde, hasta, etiqueta, color)
-    (1990.0, 2016.0, "< 2016 · > 57% del tiempo", "#7f0000"),
-    (2016.0, 2017.0, "2016–2017 · 46–57%", "#d7301f"),
-    (2017.0, 2018.0, "2017–2018 · 23–46%", "#fc8d59"),
-    (2018.0, 2018.4, "2018–2018.4 · 3–23%", "#fdcc8a"),
-    (2018.4, 2019.0, "2018.4–2019 · < 3%", "#a6d96a"),
-    (2019.0, 2020.0, "2019–2020 · < 0.03%", "#1a9641"),
-    (2020.0, 2100.0, "≥ 2020 · NAME", "#2b83ba"),
+CLASES = [  # (desde, hasta, etiqueta, color viridis)
+    (1990.0, 2016.0, "< 2016 · > 57% del tiempo", "#440154"),
+    (2016.0, 2017.0, "2016–2017 · 46–57%", "#443983"),
+    (2017.0, 2018.0, "2017–2018 · 23–46%", "#31688e"),
+    (2018.0, 2018.4, "2018–2018.4 · 3–23%", "#21918c"),
+    (2018.4, 2019.0, "2018.4–2019 · < 3%", "#35b779"),
+    (2019.0, 2020.0, "2019–2020 · < 0.03%", "#90d743"),
+    (2020.0, 2100.0, "≥ 2020 · NAME", "#fde725"),
 ]
 
 
@@ -102,11 +102,11 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     ax.set_title(titulo)
     ax.grid(alpha=0.3)
     if bajos:
-        ax.scatter([d for d, _, _ in bajos], [v for _, v, _ in bajos], marker="v", s=80, c="#7f0000", zorder=5,
+        ax.scatter([d for d, _, _ in bajos], [v for _, v, _ in bajos], marker="v", s=80, c="red", edgecolors="k", zorder=5,
                    label="punto bajo (detalle 20 m)")
         for d, v, largo in bajos:
             ax.annotate(f"{v:.2f}\n{largo:.0f} m", (d, v), xytext=(0, -10), textcoords="offset points",
-                        ha="center", va="top", fontsize=12, color="#7f0000")
+                        ha="center", va="top", fontsize=12, color="darkred")
     ax.legend(loc="upper left", fontsize=13)
     fig.tight_layout()
     bb = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
