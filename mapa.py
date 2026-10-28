@@ -3,10 +3,13 @@ import numpy as np, geopandas as gpd, rasterio
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.colors import LightSource
+from matplotlib.colors import LightSource, to_hex
 from matplotlib.lines import Line2D
 from rasterio.windows import from_bounds
 from bordo_analisis import CLASES
+
+VIRIDIS = [to_hex(c) for c in plt.cm.viridis(np.linspace(0, 1, len(CLASES)))]  # amarillo = ≥ 2020
+GROSOR = 9
 
 
 def main(mdt, gpkg, png):
@@ -27,14 +30,14 @@ def main(mdt, gpkg, png):
     fig, ax = plt.subplots(figsize=(13, max(6, min(20, alto))))
     ax.imshow(hs, cmap="gray", extent=ext)
     ax.imshow(np.ma.masked_invalid(z), cmap="Greys_r", vmin=2010, vmax=2024, alpha=0.35, extent=ext)
-    colores = {c[2]: c[3] for c in CLASES}
-    seg.plot(ax=ax, color=[colores[c] for c in seg.clase], linewidth=3)
+    colores = {c[2]: v for c, v in zip(CLASES, VIRIDIS)}
+    seg.plot(ax=ax, color=[colores[c] for c in seg.clase], linewidth=GROSOR, capstyle="round")
     criticos = bajos[bajos.z_min < 2018.0]
     ax.scatter(criticos.geometry.x, criticos.geometry.y, marker="^", s=90, c="red", edgecolors="k", zorder=5)
     for _, r in criticos.iterrows():
         ax.annotate(f"{r.id}: {r.z_min:.2f}", (r.geometry.x, r.geometry.y), xytext=(5, -9),
                     textcoords="offset points", fontsize=8, color="darkred", weight="bold")
-    ax.legend([Line2D([0], [0], color=c[3], lw=4) for c in CLASES], [c[2] for c in CLASES],
+    ax.legend([Line2D([0], [0], color=v, lw=GROSOR) for v in VIRIDIS], [c[2] for c in CLASES],
               loc="lower left", fontsize=8, title="Cota del bordo (msnm)")
     ax.set_xlim(bx[0], bx[2]); ax.set_ylim(bx[1], bx[3])
     ax.ticklabel_format(useOffset=False, style="plain")
