@@ -9,3 +9,6 @@ geopandas
 pyogrio
 shapely
 earthengine-api
+laspy
+ezdxf
+pyproj

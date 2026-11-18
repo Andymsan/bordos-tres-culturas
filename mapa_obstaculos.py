@@ -7,7 +7,7 @@ from matplotlib.colors import LightSource
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from rasterio.windows import from_bounds
-from bordo_analisis import SEMIANCHO, PASO
+from bordo_analisis import SEMIANCHO, PASO, IMTA_A_ENDHO
 
 COLOR = {"árbol": "#2e9e44", "edificio": "#e0590c"}
 
@@ -69,9 +69,9 @@ def main(mdt, carpeta, png):
         a.plot(p.dist_m, p.z_bordo, color="#1d74c9", lw=1.5)
         for tipo, c in COLOR.items():
             m = (p.tipo == tipo).values
-            a.fill_between(p.dist_m, 2015.5, 2021, where=m, color=c, alpha=0.35, lw=0, step="mid")
+            a.fill_between(p.dist_m, 2015.5 + IMTA_A_ENDHO, 2021 + IMTA_A_ENDHO, where=m, color=c, alpha=0.35, lw=0, step="mid")
             filas.append((lado, tipo, m.sum() * PASO))
-        a.set_xlim(0, p.dist_m.max()); a.set_ylim(2016.5, 2021)
+        a.set_xlim(0, p.dist_m.max()); a.set_ylim(2016.5 + IMTA_A_ENDHO, 2021 + IMTA_A_ENDHO)
         a.set_ylabel("msnm"); a.grid(alpha=0.3)
         a.set_title(f"Margen {lado.lower()} · franjas = tramos tapados", fontsize=10)
     a.set_xlabel("Distancia a lo largo del bordo (m)")

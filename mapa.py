@@ -14,7 +14,10 @@ GROSOR = 9
 
 def main(mdt, gpkg, png):
     seg = gpd.read_file(gpkg, layer="bordo_por_cota")
-    bajos = gpd.read_file(gpkg, layer="puntos_bajos")
+    try:
+        bajos = gpd.read_file(gpkg, layer="puntos_bajos")
+    except Exception:  # capa ausente: no hubo puntos bajos
+        bajos = gpd.GeoDataFrame({"id": [], "z_min": []}, geometry=[], crs=seg.crs)
     b = seg.total_bounds
     bx = (b[0] - 60, b[1] - 60, b[2] + 60, b[3] + 60)
     with rasterio.open(mdt) as r:

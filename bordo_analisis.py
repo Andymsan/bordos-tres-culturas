@@ -13,15 +13,16 @@ from scipy.signal import savgol_filter
 from skimage.morphology import remove_small_objects
 from shapely.geometry import LineString, Point, shape
 
+IMTA_A_ENDHO = 3.49                 # m; cota Endhó = cota MDT (IMTA) + 3.49 (INEGI = Endhó + 4.04 = IMTA + 7.53)
 SEMIANCHO, PASO = 2.0, 0.5          # m
 VENTANA_PERFIL = (121, 201)         # muestras: mediana 60 m + Savitzky-Golay 100 m, perfil del bordo
 VENTANA_DETALLE = (41, 61)          # muestras: mediana 20 m + Savitzky-Golay 30 m, puntos bajos angostos
-COTA_ALERTA = 2018.4                # msnm
+COTA_ALERTA = 2018.4                # msnm, datum Endhó (todas las cotas de aquí en adelante)
 LONG_MIN_BAJO = 2.0                 # m
-Y_GRAFICA = (2013.0, 2023.0)        # msnm, eje vertical fijo
+Y_GRAFICA = (2016.5, 2026.5)        # msnm, eje vertical fijo
 TAMANO_GRAFICA = (30, 4.5)          # pulgadas; más ancho = menos exageración vertical
 PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
-Z_ESTRUCTURA = 2022.0               # puentes, edificios y árboles se ignoran
+Z_ESTRUCTURA = 2022.0 + IMTA_A_ENDHO  # puentes, edificios y árboles se ignoran
 INICIO_RIO = (463860, 2218660)      # aguas arriba; el perfil empieza en el extremo más cercano
 SALIENTE = 1.0                      # m sobre la mediana del MDT en 5 m: algo sobresale
 NDVI_ARBOL = 0.4                    # Sentinel-2
@@ -126,6 +127,7 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
         w = from_bounds(b[0] - 30, b[1] - 30, b[2] + 30, b[3] + 30, r.transform)
         z = r.read(1, window=w).astype("float64")
         z[z < 1900] = np.nan
+        z += IMTA_A_ENDHO               # MDT IMTA → datum Endhó, el mismo de los niveles de la presa
         T, crs = r.window_transform(w), r.crs
     px = T.a
     valid = ~np.isnan(z)
@@ -153,7 +155,7 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
 
     k = int(10 / px) * 2 + 1
     media = ndi.uniform_filter(np.where(valid, z, 0), k) / np.maximum(ndi.uniform_filter(valid.astype("float32"), k), 1e-6)
-    cresta = valid & (z - media > 0.3) & (z > 2015) & (z < Z_ESTRUCTURA)
+    cresta = valid & (z - media > 0.3) & (z > 2015 + IMTA_A_ENDHO) & (z < Z_ESTRUCTURA)
     cresta = remove_small_objects(ndi.binary_closing(cresta, iterations=2), int(10 / px ** 2))
     cerca_cresta = ndi.binary_dilation(cresta, iterations=int(1.5 / px))
 
@@ -247,9 +249,12 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
         os.remove(g)
     gpd.GeoDataFrame(resumen, crs=crs).to_file(g, layer="bordo", driver="GPKG")
     gpd.GeoDataFrame(segs, crs=crs).to_file(g, layer="bordo_por_cota", driver="GPKG")
-    B = gpd.GeoDataFrame(bajos, crs=crs).sort_values("z_min")
+    if not bajos:
+        print(f"Sin puntos bajos bajo la cota de alerta {COTA_ALERTA} (datum Endhó)")
+    B = (gpd.GeoDataFrame(bajos, crs=crs) if bajos else gpd.GeoDataFrame({"z_min": []}, geometry=[], crs=crs)).sort_values("z_min")
     B.insert(0, "id", range(1, len(B) + 1))
-    B.to_file(g, layer="puntos_bajos", driver="GPKG")
+    if len(B):
+        B.to_file(g, layer="puntos_bajos", driver="GPKG")
     if obst.any():
         franja = lineas.buffer(SEMIANCHO + 1).union_all()
         ob_geo = [(shape(p), OBSTACULO[int(v)]) for p, v in shapes(obst, mask=obst > 0, transform=T)]

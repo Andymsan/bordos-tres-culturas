@@ -55,4 +55,15 @@ python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_b
 python mapa_obstaculos.py MDT_27102025.tif resultados resultados/mapa_obstaculos.png
 ```
 
-MDT: `MDT_27102025.tif` (EPSG:32614). Niveles: registro diario de la presa Endhó 1995–2025.
+MDT: `MDT_27102025.tif` (EPSG:32614), modelo de elevación del IMTA. Niveles: registro diario de la presa Endhó 1995–2025.
+
+## Datum
+
+Las cotas del MDT (IMTA) y los niveles de la presa (Endhó) usan bancos de nivel distintos. Ligas topográficas:
+
+| Referencia | Endhó | IMTA | INEGI |
+|---|---|---|---|
+| Cresta del vertedor | 2018.00 | | 2022.04 |
+| Banco IMTA | | 2026.44 | 2033.97 |
+
+INEGI = Endhó + 4.04 = IMTA + 7.53, por lo tanto **Endhó = IMTA + 3.49**. `bordo_analisis.py` suma `IMTA_A_ENDHO = 3.49` al MDT, así que todas las cotas de `resultados/` están en datum Endhó. `mdt_a_puntos.py` exporta el MDT sin ajuste (datum IMTA). La diferencia de 0.09 m entre la regleta y la cresta se desprecia por ahora.

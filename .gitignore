@@ -4,3 +4,4 @@ __pycache__/
 *.xlsx
 *.gpkg-wal
 *.gpkg-shm
+.venv/
