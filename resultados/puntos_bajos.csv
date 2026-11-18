@@ -1,1 +1,5 @@
-﻿id,z_min,x,y
+﻿id,margen,dist_m,z_min,largo_m,bordo_libre_m,sobre_max_hist_m,frec_pct,dias_anio,meses_50pct,sobre_cresta,obstaculo,x,y
+1,Derecha,1495.0,2020.6,40.0,0.6,1.22,0.0,0,ninguno,sí,no,463930.7,2219393.4
+2,Derecha,1433.0,2020.86,18.0,0.86,1.48,0.0,0,ninguno,sí,no,463978.9,2219430.5
+3,Derecha,2576.5,2020.91,15.5,0.91,1.53,0.0,0,ninguno,no,no,463660.8,2220069.6
+4,Izquierda,1631.0,2020.92,10.5,0.92,1.54,0.0,0,ninguno,sí,no,463743.4,2219528.7

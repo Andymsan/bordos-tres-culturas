@@ -6,9 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LightSource, to_hex
 from matplotlib.lines import Line2D
 from rasterio.windows import from_bounds
-from bordo_analisis import CLASES
-
-VIRIDIS = [to_hex(c) for c in plt.cm.viridis(np.linspace(0, 1, len(CLASES)))]  # amarillo = ≥ 2020
+from bordo_analisis import CLASES, COLORES as VIRIDIS, COTA_ALERTA, BORDO_LIBRE_MIN
 GROSOR = 9
 
 
@@ -35,13 +33,15 @@ def main(mdt, gpkg, png):
     ax.imshow(np.ma.masked_invalid(z), cmap="Greys_r", vmin=2010, vmax=2024, alpha=0.35, extent=ext)
     colores = {c[2]: v for c, v in zip(CLASES, VIRIDIS)}
     seg.plot(ax=ax, color=[colores[c] for c in seg.clase], linewidth=GROSOR, capstyle="round")
-    criticos = bajos[bajos.z_min < 2018.0]
+    criticos = bajos[bajos.z_min < COTA_ALERTA]
     ax.scatter(criticos.geometry.x, criticos.geometry.y, marker="^", s=90, c="red", edgecolors="k", zorder=5)
     for _, r in criticos.iterrows():
         ax.annotate(f"{r.id}: {r.z_min:.2f}", (r.geometry.x, r.geometry.y), xytext=(5, -9),
                     textcoords="offset points", fontsize=8, color="darkred", weight="bold")
-    ax.legend([Line2D([0], [0], color=v, lw=GROSOR) for v in VIRIDIS], [c[2] for c in CLASES],
-              loc="lower left", fontsize=8, title="Cota del bordo (msnm)")
+    ax.legend([Line2D([0], [0], color=v, lw=GROSOR) for v in VIRIDIS] +
+              [Line2D([0], [0], marker="^", ls="", color="red", markeredgecolor="k", markersize=9)],
+              [c[2] for c in CLASES] + [f"Punto bajo: bordo libre < {BORDO_LIBRE_MIN:g} m"],
+              loc="lower left", fontsize=8, title="Cota del bordo (msnm, datum Endhó) · bordo libre sobre el NAME")
     ax.set_xlim(bx[0], bx[2]); ax.set_ylim(bx[1], bx[3])
     ax.ticklabel_format(useOffset=False, style="plain")
     fig.tight_layout()

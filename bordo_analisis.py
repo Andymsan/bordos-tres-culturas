@@ -17,9 +17,12 @@ IMTA_A_ENDHO = 3.49                 # m; cota Endhó = cota MDT (IMTA) + 3.49 (I
 SEMIANCHO, PASO = 2.0, 0.5          # m
 VENTANA_PERFIL = (121, 201)         # muestras: mediana 60 m + Savitzky-Golay 100 m, perfil del bordo
 VENTANA_DETALLE = (41, 61)          # muestras: mediana 20 m + Savitzky-Golay 30 m, puntos bajos angostos
-COTA_ALERTA = 2018.4                # msnm, datum Endhó (todas las cotas de aquí en adelante)
+NAME = 2020.0                       # msnm, datum Endhó (todas las cotas de aquí en adelante)
+CRESTA = 2018.0                     # msnm, cresta del vertedor
+BORDO_LIBRE_MIN = 1.0               # m sobre el NAME; menos que esto = punto bajo
+COTA_ALERTA = NAME + BORDO_LIBRE_MIN
 LONG_MIN_BAJO = 2.0                 # m
-Y_GRAFICA = (2016.5, 2026.5)        # msnm, eje vertical fijo
+Y_GRAFICA = (2017.0, 2025.0)        # msnm, eje vertical fijo
 TAMANO_GRAFICA = (30, 4.5)          # pulgadas; más ancho = menos exageración vertical
 PASO_GRAFICA = 2.0                  # m, espaciado del máximo de la franja en la gráfica
 Z_ESTRUCTURA = 2022.0 + IMTA_A_ENDHO  # puentes, edificios y árboles se ignoran
@@ -29,19 +32,21 @@ NDVI_ARBOL = 0.4                    # Sentinel-2
 ALTURA_ARBOL = 2.0                  # m, dosel de Meta
 OBSTACULO = {0: "no", 1: "árbol", 2: "edificio"}
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
-CLASES = [  # (desde, hasta, etiqueta, color viridis)
-    (1990.0, 2016.0, "< 2016 · > 57% del tiempo", "#440154"),
-    (2016.0, 2017.0, "2016–2017 · 46–57%", "#443983"),
-    (2017.0, 2018.0, "2017–2018 · 23–46%", "#31688e"),
-    (2018.0, 2018.4, "2018–2018.4 · 3–23%", "#21918c"),
-    (2018.4, 2019.0, "2018.4–2019 · < 3%", "#35b779"),
-    (2019.0, 2020.0, "2019–2020 · < 0.03%", "#90d743"),
-    (2020.0, 2100.0, "≥ 2020 · NAME", "#fde725"),
+CLASES = [  # (desde, hasta, etiqueta, clave) por bordo libre sobre el NAME
+    (1990.0, 2020.0, "< 2020 · bajo el NAME", "m_bajo_NAME"),
+    (2020.0, 2021.0, "2020–2021 · bordo libre < 1 m", "m_bl_0_1"),
+    (2021.0, 2021.5, "2021–2021.5 · 1–1.5 m", "m_bl_1_1.5"),
+    (2021.5, 2022.0, "2021.5–2022 · 1.5–2 m", "m_bl_1.5_2"),
+    (2022.0, 2022.5, "2022–2022.5 · 2–2.5 m", "m_bl_2_2.5"),
+    (2022.5, 2023.0, "2022.5–2023 · 2.5–3 m", "m_bl_2.5_3"),
+    (2023.0, 2023.5, "2023–2023.5 · 3–3.5 m", "m_bl_3_3.5"),
+    (2023.5, 2100.0, "≥ 2023.5 · > 3.5 m", "m_bl_3.5_mas"),
 ]
+COLORES = [matplotlib.colors.to_hex(c) for c in matplotlib.colormaps["viridis"](np.linspace(0, 1, len(CLASES)))]
 
 
 def clase_de(z):
-    for a, b, etiqueta, _ in CLASES:
+    for a, b, etiqueta, *_ in CLASES:
         if a <= z < b:
             return etiqueta
     return CLASES[-1][2]
@@ -80,7 +85,7 @@ def tramos_bajos(dist, z, cota, long_min):
     return res
 
 
-def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
+def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta, max_hist):
     plt.rcParams.update({"font.size": 15})
     fig, ax = plt.subplots(figsize=TAMANO_GRAFICA)
     k = max(1, int(PASO_GRAFICA / PASO))
@@ -89,17 +94,19 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
     pts = [(d, v) for d, v in zip(dist, z_filt) if v is not None]
     segs = [[pts[i], pts[i + 1]] for i in range(len(pts) - 1)]
     limites = [c[0] for c in CLASES] + [CLASES[-1][1]]
-    lc = LineCollection(segs, cmap=ListedColormap([c[3] for c in CLASES]),
+    lc = LineCollection(segs, cmap=ListedColormap(COLORES),
                         norm=BoundaryNorm(limites, len(CLASES)), linewidths=4)
     lc.set_array([(a[1] + b[1]) / 2 for a, b in segs])
     ax.add_collection(lc)
-    for cota, txt in [(2016, "2016"), (2018, "2018 · cresta del vertedor"), (2020, "2020 · NAME")]:
+    for cota, txt in [(CRESTA, "cresta del vertedor"), (max_hist, "nivel máximo registrado"),
+                      (NAME, "NAME"), (COTA_ALERTA, f"NAME + {BORDO_LIBRE_MIN:g} m de bordo libre")]:
         ax.axhline(cota, ls="--", lw=0.8, color="#555")
-        ax.text(dist[-1], cota + 0.05, txt, ha="right", va="bottom", fontsize=13, color="#333")
+        ax.text(dist[0] + 10, cota + 0.05, f"{cota:.2f} ({cota - IMTA_A_ENDHO:.2f} MDE) · {txt}",
+                ha="left", va="bottom", fontsize=13, color="#333")
     ax.set_ylim(*Y_GRAFICA)
     ax.set_xlim(dist[0], dist[-1])
     ax.set_xlabel("Distancia a lo largo del bordo (m)")
-    ax.set_ylabel("Cota del bordo (msnm)")
+    ax.set_ylabel("Cota del bordo (msnm, datum Endhó)")
     ax.set_title(titulo)
     ax.grid(alpha=0.3)
     if bajos:
@@ -108,7 +115,7 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta):
         for d, v, largo in bajos:
             ax.annotate(f"{v:.2f}\n{largo:.0f} m", (d, v), xytext=(0, -10), textcoords="offset points",
                         ha="center", va="top", fontsize=12, color="darkred")
-    ax.legend(loc="upper left", fontsize=13)
+    ax.legend(loc="upper right", bbox_to_anchor=(1, 0.9), fontsize=13)
     fig.tight_layout()
     bb = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     ex = ((dist[-1] - dist[0]) / bb.width) / ((Y_GRAFICA[1] - Y_GRAFICA[0]) / bb.height)
@@ -180,6 +187,7 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
     nv = nv[(nv.nivel > 1990) & (nv.nivel < 2030)]
     nv["mes"] = pd.to_datetime(nv.fecha).dt.month
     niv = np.sort(nv.nivel.values)
+    max_hist = float(niv[-1])
     niv_m = {m: np.sort(nv[nv.mes == m].nivel.values) for m in range(1, 13)}
 
     def pct(s, v):
@@ -226,20 +234,18 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
             fr = pct(niv, v)
             marcas.append((dist[i], v, t["largo"]))
             bajos.append({"margen": lado, "dist_m": round(dist[i], 1), "z_min": round(v, 2), "largo_m": round(t["largo"], 1),
+                          "bordo_libre_m": round(v - NAME, 2), "sobre_max_hist_m": round(v - max_hist, 2),
                           "frec_pct": round(fr, 1), "dias_anio": round(fr * 3.65), "meses_50pct": meses(v),
-                          "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i],
-                          **{m: round(pct(niv_m[n + 1], v), 1) for n, m in enumerate(MESES)}, "geometry": pts[i]})
+                          "sobre_cresta": "sí" if oc[i] else "no", "obstaculo": ob[i], "geometry": pts[i]})
 
         zs = np.array([v for v in zm if v is not None])
         resumen.append({"margen": lado, "largo_m": round(ln.length), "z_min": round(zs.min(), 2),
                         "z_mediana": round(float(np.median(zs)), 2), "z_max": round(zs.max(), 2),
-                        "m_bajo_2016": int((zs < 2016).sum() * PASO),
-                        "m_2016_2017": int(((zs >= 2016) & (zs < 2017)).sum() * PASO),
-                        "m_2017_2018": int(((zs >= 2017) & (zs < 2018)).sum() * PASO),
-                        "m_2018_2018_4": int(((zs >= 2018) & (zs < 2018.4)).sum() * PASO),
+                        "bordo_libre_min_m": round(zs.min() - NAME, 2), "sobre_max_hist_m": round(zs.min() - max_hist, 2),
+                        **{c[3]: int(((zs >= c[0]) & (zs < c[1])).sum() * PASO) for c in CLASES},
                         "pct_sobre_cresta": round(100 * np.mean(oc)),
                         "m_arbol": int(ob.count("árbol") * PASO), "m_edificio": int(ob.count("edificio") * PASO), "geometry": ln})
-        graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, marcas, f"{out}/perfil_margen_{lado}.png")
+        graficar(f"Perfil del bordo · margen {lado.lower()}", dist, zc, zm, marcas, f"{out}/perfil_margen_{lado}.png", max_hist)
         pd.DataFrame({"dist_m": dist, "x": [p.x for p in pts], "y": [p.y for p in pts], "z_cruda": zc, "z_bordo": zm, "z_detalle": zd,
                       "dias_anio": [round(pct(niv, v) * 3.65, 1) if v is not None else None for v in zm],
                       "sobre_cresta": oc, "obstaculo": ob}).round(2).to_csv(f"{out}/perfil_margen_{lado}.csv", index=False, encoding="utf-8-sig")
@@ -250,7 +256,7 @@ def main(mdt, niveles, gpkg, capa, out, satelite=None):
     gpd.GeoDataFrame(resumen, crs=crs).to_file(g, layer="bordo", driver="GPKG")
     gpd.GeoDataFrame(segs, crs=crs).to_file(g, layer="bordo_por_cota", driver="GPKG")
     if not bajos:
-        print(f"Sin puntos bajos bajo la cota de alerta {COTA_ALERTA} (datum Endhó)")
+        print(f"Sin puntos bajos bajo {COTA_ALERTA:g} msnm (NAME + {BORDO_LIBRE_MIN:g} m)")
     B = (gpd.GeoDataFrame(bajos, crs=crs) if bajos else gpd.GeoDataFrame({"z_min": []}, geometry=[], crs=crs)).sort_values("z_min")
     B.insert(0, "id", range(1, len(B) + 1))
     if len(B):
