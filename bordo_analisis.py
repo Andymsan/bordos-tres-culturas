@@ -115,7 +115,11 @@ def graficar(titulo, dist, z_crudo, z_filt, bajos, ruta, max_hist):
         for d, v, largo in bajos:
             ax.annotate(f"{v:.2f}\n{largo:.0f} m", (d, v), xytext=(0, -10), textcoords="offset points",
                         ha="center", va="top", fontsize=12, color="darkred")
-    ax.legend(loc="upper right", bbox_to_anchor=(1, 0.9), fontsize=13)
+    leyenda = ax.legend(loc="upper right", bbox_to_anchor=(1, 0.9), fontsize=13)
+    ax.add_artist(leyenda)
+    from matplotlib.patches import Patch
+    ax.legend([Patch(color=c) for c in COLORES[1:]], [x[2] for x in CLASES[1:]], loc="lower right", ncol=4, fontsize=11,
+              title="Bordo libre sobre el NAME", title_fontsize=11)
     fig.tight_layout()
     bb = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     ex = ((dist[-1] - dist[0]) / bb.width) / ((Y_GRAFICA[1] - Y_GRAFICA[0]) / bb.height)
