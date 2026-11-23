@@ -29,6 +29,27 @@
 - [Temporada por mes](resultados/temporada_por_mes.csv)
 - [Bordo libre por tramo](resultados/bordo_libre_por_tramo.csv)
 
+## Datum
+
+Las cotas del MDT (IMTA) y los niveles de la presa (Endhó) usan bancos de nivel distintos:
+
+| Referencia | Endhó | IMTA | INEGI |
+|---|---|---|---|
+| Cresta del vertedor | 2018.00 | | 2022.04 |
+| Banco IMTA | | 2026.44 | 2033.97 |
+
+INEGI = Endhó + 4.04 = IMTA + 7.53, por lo tanto **Endhó = IMTA + 3.49**. `
+
+Equivalencias (Endhó → MDE): cresta 2018.00 → 2014.51; nivel máximo registrado 2019.38 → 2015.89; NAME 2020.00 → 2016.51; NAME + 1 m 2021.00 → 2017.51.
+
+## Revisión del banco de nivel IMTA
+
+![Banco de nivel IMTA en el MDE](resultados/banco_imta_mde.png)
+
+Punto azul: coincide, hay una diferencia de .11. 
+Punto rojo (supervicsión): está 2.6 m al sur y el MDE baja a 2025.40 por el canal 
+Con ese punto sería 4.53 en vez de 3.49.
+
 ## Archivos
 
 | Archivo | Contenido |
@@ -59,27 +80,5 @@ python banco_imta.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/
 
 MDT: `MDT_27102025.tif` (EPSG:32614), modelo de elevación del IMTA. Niveles: registro diario de la presa Endhó 1995–2025.
 
-## Datum
 
-Las cotas del MDT (IMTA) y los niveles de la presa (Endhó) usan bancos de nivel distintos. Ligas topográficas:
 
-| Referencia | Endhó | IMTA | INEGI |
-|---|---|---|---|
-| Cresta del vertedor | 2018.00 | | 2022.04 |
-| Banco IMTA | | 2026.44 | 2033.97 |
-
-INEGI = Endhó + 4.04 = IMTA + 7.53, por lo tanto **Endhó = IMTA + 3.49**. `bordo_analisis.py` suma `IMTA_A_ENDHO = 3.49` al MDT, así que todas las cotas de `resultados/` están en datum Endhó. `mdt_a_puntos.py` exporta el MDT sin ajuste (datum IMTA). La diferencia de 0.09 m entre la regleta y la cresta se desprecia por ahora.
-
-Equivalencias (Endhó → MDE): cresta 2018.00 → 2014.51; nivel máximo registrado 2019.38 → 2015.89; NAME 2020.00 → 2016.51; NAME + 1 m 2021.00 → 2017.51.
-
-## Revisión del banco de nivel IMTA
-
-![Banco de nivel IMTA en el MDE](resultados/banco_imta_mde.png)
-
-En el punto de Ariel (azul) sí coincide, hay una diferencia de .11. Lo único que me preocupa es que el banco que medimos con la supervisión el 12-11-2026 (rojo) está 2.6 m al sur y el MDE baja a 2025.40 por el canal que pasa por ahí. Con ese punto la liga sería 4.53 en vez de 3.49.
-
-Por ahora seguimos con 3.49 porque cuadra con el NAME en 2016.51 del MDE y es lo más conservador. Para confirmarlo hay que medir 2 o 3 puntos en terreno plano.
-
-## Clases y puntos bajos
-
-El bordo se clasifica por **bordo libre sobre el NAME** (2020 msnm, datum Endhó) en pasos de 0.5 m. Un punto bajo es un tramo de al menos 2 m con bordo libre menor a `BORDO_LIBRE_MIN = 1.0` m (cota < 2021.0), medido en el perfil de detalle (20 m).
