@@ -44,7 +44,7 @@ Equivalencias (Endhó → MDE): cresta 2018.00 → 2014.51; nivel máximo regist
 
 ## Revisión del banco de nivel IMTA
 
-![Banco de nivel IMTA en el MDE](resultados/banco_imta_mde.png)
+![Banco de nivel IMTA en el MDE](resultados/banco_imta_mde_v2.png)
 
 Punto azul: coincide, hay una diferencia de .11. 
 Punto rojo (supervisión): está 2.6 m al sur y el MDE baja a 2025.40 por el canal 
@@ -75,7 +75,7 @@ python bordo_analisis.py MDT_27102025.tif niveles_endho.xlsx datos/bordos.gpkg b
 python bordo_libre_por_tramo.py niveles_endho.xlsx resultados
 python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
 python mapa_obstaculos.py MDT_27102025.tif resultados resultados/mapa_obstaculos.png
-python banco_imta.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/banco_imta_mde.png
+python banco_imta.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/banco_imta_mde_v2.png
 ```
 
 MDT: `MDT_27102025.tif` (EPSG:32614), modelo de elevación del IMTA. Niveles: registro diario de la presa Endhó 1995–2025.
