@@ -38,7 +38,7 @@ Las cotas del MDT (IMTA) y los niveles de la presa (Endhó) usan bancos de nivel
 | Cresta del vertedor | 2018.00 | | 2022.04 |
 | Banco IMTA | | 2026.44 | 2033.97 |
 
-INEGI = Endhó + 4.04 = IMTA + 7.53, por lo tanto **Endhó = IMTA + 3.49**. `
+INEGI = Endhó + 4.04 = IMTA + 7.53, por lo tanto **Endhó = IMTA + 3.49**.
 
 Equivalencias (Endhó → MDE): cresta 2018.00 → 2014.51; nivel máximo registrado 2019.38 → 2015.89; NAME 2020.00 → 2016.51; NAME + 1 m 2021.00 → 2017.51.
 
@@ -47,7 +47,7 @@ Equivalencias (Endhó → MDE): cresta 2018.00 → 2014.51; nivel máximo regist
 ![Banco de nivel IMTA en el MDE](resultados/banco_imta_mde.png)
 
 Punto azul: coincide, hay una diferencia de .11. 
-Punto rojo (supervicsión): está 2.6 m al sur y el MDE baja a 2025.40 por el canal 
+Punto rojo (supervisión): está 2.6 m al sur y el MDE baja a 2025.40 por el canal 
 Con ese punto sería 4.53 en vez de 3.49.
 
 ## Archivos
