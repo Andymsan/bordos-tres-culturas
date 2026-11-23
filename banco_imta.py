@@ -8,7 +8,7 @@ from rasterio.windows import from_bounds
 
 mdt, gpkg, png = sys.argv[1:4]
 BN = (464236.5909, 2220064.6431)      # nivelación 12-11-2026, 2033.97 INEGI
-AR = (464236.99, 2220067.25)          # punto de Ariel, Z 2026.44
+AR = (464236.99, 2220067.25)          # punto IMTA, Z 2026.44
 C = ((BN[0] + AR[0]) / 2, (BN[1] + AR[1]) / 2)
 bordo = gpd.read_file(gpkg, layer="bordo")
 
@@ -30,10 +30,10 @@ def puntos(ax, s=9, txt=True):
     ax.plot(*BN, "o", ms=s, mfc="red", mec="w", mew=1.5, zorder=5)
     ax.plot(*AR, "o", ms=s, mfc="#1d74c9", mec="w", mew=1.5, zorder=5)
     if txt:
-        ax.annotate("BN medido con la supervisión\n2033.97 INEGI · MDE 2024.98–2025.40", BN, xytext=(10, -22),
+        ax.annotate("BN supervisión\n2033.97 INEGI · MDE 2024.98–2025.40", BN, xytext=(10, -22),
                     textcoords="offset points", fontsize=8, color="red", weight="bold",
                     bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
-        ax.annotate("Punto de Ariel\nZ 2026.44 · MDE 2026.33–2026.44", AR, xytext=(10, 8),
+        ax.annotate("IMTA\nZ 2026.44 · MDE 2026.33–2026.44", AR, xytext=(10, 8),
                     textcoords="offset points", fontsize=8, color="#1d74c9", weight="bold",
                     bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
 
@@ -50,8 +50,8 @@ with rasterio.open(mdt) as r:
     bordo.plot(ax=a, color="#f2a900", lw=2)
     a.plot([], [], color="#f2a900", lw=2, label="Bordos Tres Culturas")
     puntos(a, 8, False)
-    a.plot([], [], "o", mfc="red", mec="w", label="BN IMTA (nivelación 12-11-2026)")
-    a.plot([], [], "o", mfc="#1d74c9", mec="w", label="Punto de Ariel")
+    a.plot([], [], "o", mfc="red", mec="w", label="BN supervisión (nivelación 12-11-2026)")
+    a.plot([], [], "o", mfc="#1d74c9", mec="w", label="IMTA")
     a.add_patch(Rectangle((C[0] - 30, C[1] - 30), 60, 60, fill=False, ec="red", lw=1.5))
     a.legend(loc="lower left", fontsize=8)
     a.set_title("Ubicación general", fontsize=11)
@@ -83,6 +83,6 @@ with rasterio.open(mdt) as r:
 for a in axs:
     a.ticklabel_format(useOffset=False, style="plain")
     a.tick_params(labelsize=7)
-fig.suptitle("Banco de nivel IMTA en el MDE de Tres Culturas: punto medido (rojo) vs punto de Ariel (azul) · EPSG:32614", fontsize=12)
+fig.suptitle("Banco de nivel IMTA en el MDE de Tres Culturas: BN supervisión (rojo) vs IMTA (azul) · EPSG:32614", fontsize=12)
 fig.tight_layout()
 fig.savefig(png, dpi=140)
