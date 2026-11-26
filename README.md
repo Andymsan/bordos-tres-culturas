@@ -50,6 +50,12 @@ Punto azul: coincide, hay una diferencia de .11.
 Punto rojo (supervisión): está 2.6 m al sur y el MDE baja a 2025.40 por el canal 
 Con ese punto sería 4.53 en vez de 3.49.
 
+## Tirante
+
+![Tirante](resultados/tirante/tirante.png)
+
+Tirante = nivel de la presa − topografía IMTA (con las cotas de Ariel: NAMO 2014.51, nivel máximo 2015.89 y NAME 2016.51 en el MDE). El DEM toma la superficie del agua, no el lecho, así que en el cauce el tirante es desde el agua del día del vuelo (≈ 2013.67 en el MDE).
+
 ## Archivos
 
 | Archivo | Contenido |
@@ -63,6 +69,7 @@ Con ese punto sería 4.53 en vez de 3.49.
 | `bordo_libre_por_tramo.py` | Bordo libre sobre el NAME del punto más bajo de cada tramo de 100 m |
 | `mapa.py` | Mapa del bordo por cota |
 | `mapa_obstaculos.py` | Mapa de árboles y edificios sobre y cerca del bordo |
+| `tirante.py` | Tirante para NAMO, nivel máximo y NAME (GeoTIFF de 1 m en `resultados/tirante/`, no se suben) |
 | `banco_imta.py` | Mapa del banco de nivel IMTA en el MDE: punto medido vs punto de Ariel |
 
 ## Uso
@@ -76,6 +83,7 @@ python bordo_libre_por_tramo.py niveles_endho.xlsx resultados
 python mapa.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/mapa_bordos.png
 python mapa_obstaculos.py MDT_27102025.tif resultados resultados/mapa_obstaculos.png
 python banco_imta.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/banco_imta_mde_v2.png
+python tirante.py MDT_27102025.tif resultados/bordo_analisis.gpkg resultados/tirante
 ```
 
 MDT: `MDT_27102025.tif` (EPSG:32614), modelo de elevación del IMTA. Niveles: registro diario de la presa Endhó 1995–2025.
